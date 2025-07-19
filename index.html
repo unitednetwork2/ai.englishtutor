@@ -2,125 +2,163 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>2-Way AI Spoken English Tutor</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f0f0f5;
+      background: #f1f3f6;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      margin: 0;
     }
     .container {
       background: white;
-      padding: 30px;
-      border-radius: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-      text-align: center;
-      width: 90%;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 100%;
       max-width: 500px;
     }
-    select, button {
-      padding: 10px;
-      margin-top: 10px;
+    h1 {
+      font-size: 1.5em;
+      text-align: center;
+    }
+    select, button, input {
       width: 100%;
-      font-size: 16px;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 1em;
     }
-    #output {
-      margin-top: 20px;
-      min-height: 50px;
-      font-size: 18px;
-      text-align: left;
+    .chat-box {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      height: 200px;
+      overflow-y: auto;
+      background: #fafafa;
+      margin-bottom: 10px;
     }
-    .bot { color: #0077cc; }
-    .user { color: #333; }
+    .chat-bubble {
+      padding: 8px 12px;
+      border-radius: 12px;
+      margin-bottom: 6px;
+      max-width: 80%;
+    }
+    .bot {
+      background-color: #e0e0ff;
+      align-self: flex-start;
+    }
+    .user {
+      background-color: #dcf8c6;
+      align-self: flex-end;
+      text-align: right;
+    }
+    .status {
+      font-size: 0.9em;
+      color: gray;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>👩‍🏫 Kritika – Your AI English Tutor</h2>
+    <h1>👩‍🏫 2-Way AI Spoken English Tutor</h1>
     <label>Choose Accent Focus:</label>
     <select id="accent">
       <option value="en-IN">Indian English</option>
       <option value="hi-IN">Hindi-English</option>
     </select>
-    <button id="start">🎙️ Start Talking</button>
-    <div id="output"></div>
+    <div class="chat-box" id="chatBox"></div>
+    <input type="text" id="textInput" placeholder="Type your message here...">
+    <button onclick="sendText()">Send</button>
+    <button onclick="startTalking()">🎤 Start Talking</button>
+    <div class="status" id="status"></div>
   </div>
 
   <script>
-    const startBtn = document.getElementById("start");
-    const output = document.getElementById("output");
-    const accent = document.getElementById("accent");
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
     const synth = window.speechSynthesis;
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-IN';
 
-    let conversation = [];
-    const tutorIntro = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
+    const chatBox = document.getElementById("chatBox");
+    const status = document.getElementById("status");
 
-    startBtn.onclick = () => {
-      startBtn.disabled = true;
-      speakAndListen(tutorIntro);
-    };
+    const messages = [
+      { role: "assistant", content: "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?" }
+    ];
 
-    function speakAndListen(text) {
-      conversation.push({ role: "bot", text });
-      updateChat();
-
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = accent.value;
-      synth.speak(utter);
-
-      utter.onend = () => {
-        recognition.lang = accent.value;
-        recognition.start();
-      };
+    function addMessage(role, text) {
+      const bubble = document.createElement("div");
+      bubble.className = "chat-bubble " + (role === "assistant" ? "bot" : "user");
+      bubble.innerText = text;
+      chatBox.appendChild(bubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    recognition.onresult = async (event) => {
-      const userSpeech = event.results[0][0].transcript;
-      conversation.push({ role: "user", text: userSpeech });
-      updateChat();
-
-      // GPT-like reply simulation (can connect to server for real AI)
-      const reply = await generateReply(userSpeech);
-      speakAndListen(reply);
-    };
-
-    recognition.onerror = (event) => {
-      conversation.push({ role: "bot", text: `Oops, I couldn’t hear that. (${event.error})` });
-      updateChat();
-      startBtn.disabled = false;
-    };
-
-    function updateChat() {
-      output.innerHTML = conversation.map(msg =>
-        `<div class="${msg.role}"><strong>${msg.role === 'bot' ? '👩 Kritika' : '🧑 You'}:</strong> ${msg.text}</div>`
-      ).join('');
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = document.getElementById("accent").value;
+      synth.speak(utterance);
     }
 
-    async function generateReply(userInput) {
-      // Simple rule-based simulation for demo
-      userInput = userInput.toLowerCase();
+    function sendText() {
+      const input = document.getElementById("textInput");
+      const userText = input.value.trim();
+      if (!userText) return;
+      input.value = "";
+      addMessage("user", userText);
+      handleConversation(userText);
+    }
 
-      if (userInput.includes("my name is")) {
-        return "Nice to meet you! What do you like to do in your free time?";
-      } else if (userInput.includes("how are you")) {
-        return "I'm great, thank you! Ready to help you improve your English.";
-      } else if (userInput.includes("hobby") || userInput.includes("like")) {
-        return "That's a nice hobby! Let's try speaking more about it.";
+    function handleConversation(input) {
+      let response = "";
+
+      if (input.toLowerCase().includes("my name is")) {
+        response = "Nice to meet you! What are your hobbies?";
+      } else if (input.toLowerCase().includes("hobby")) {
+        response = "That's interesting! Why do you enjoy it?";
+      } else if (input.toLowerCase().includes("how are you")) {
+        response = "I'm great, thank you! How about you?";
       } else {
-        return "Interesting! Can you tell me more or ask me a question?";
+        response = "That's nice! Can you tell me more?";
       }
+
+      addMessage("assistant", response);
+      speak(response);
     }
+
+    function startTalking() {
+      recognition.lang = document.getElementById("accent").value;
+      recognition.start();
+      status.innerText = "🎙️ Listening...";
+    }
+
+    recognition.onresult = function (event) {
+      const transcript = event.results[0][0].transcript;
+      addMessage("user", transcript);
+      handleConversation(transcript);
+      status.innerText = "";
+    };
+
+    recognition.onspeechend = function () {
+      recognition.stop();
+      status.innerText = "🛑 Speech ended.";
+    };
+
+    recognition.onerror = function (event) {
+      status.innerText = "❌ Error: " + event.error;
+    };
+
+    // Start with greeting
+    window.onload = () => {
+      const greeting = messages[0].content;
+      addMessage("assistant", greeting);
+      speak(greeting);
+    };
   </script>
 </body>
 </html>
