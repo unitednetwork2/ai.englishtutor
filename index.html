@@ -1,155 +1,93 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>2-Way AI Spoken English Tutor</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0f2f5;
-      padding: 20px;
-    }
-    .container {
-      max-width: 700px;
-      margin: auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    }
-    select, button, textarea, input {
-      width: 100%;
-      margin-top: 10px;
-      padding: 10px;
-      font-size: 16px;
-    }
-    .output {
-      background: #e3f2fd;
-      padding: 10px;
-      border-radius: 8px;
-      margin-top: 15px;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .btn-row button {
-      flex: 1;
-    }
-    .status {
-      margin-top: 10px;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>🧑‍🏫 2-Way AI Spoken English Tutor</h2>
+// ✅ script.js for AI English Tutor using Groq API
 
-    <label for="accentMode">Choose Accent Focus:</label>
-    <select id="accentMode">
-      <option value="indian">Indian English</option>
-      <option value="hindi">Hindi-English Accent</option>
-    </select>
+const apiKey = "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";
+const model = "mixtral-8x7b-32768"; // Or use "llama3-70b-8192" if needed
 
-    <div class="btn-row">
-      <button onclick="startConversation()">🎙️ Start Talking</button>
-    </div>
+let conversationHistory = [
+  {
+    role: "system",
+    content: "You are Kritika, a friendly and natural AI English tutor for Indian students. You help them practice spoken English through casual conversation. Keep responses short, friendly, and engaging. Ask one question at a time."
+  },
+];
 
-    <input type="text" id="textInput" placeholder="Type a question..." onkeydown="if(event.key==='Enter')sendText()">
-    <button onclick="sendText()">💬 Send</button>
+const chatDisplay = document.getElementById("chat-display");
+const userInput = document.getElementById("user-input");
+const sendButton = document.getElementById("send-button");
+const talkButton = document.getElementById("talk-button");
 
-    <p class="status" id="status">Click to begin speaking...</p>
-    <div class="output" id="conversation"></div>
-  </div>
+// Send message to Groq
+async function sendMessage(message) {
+  conversationHistory.push({ role: "user", content: message });
 
-  <script>
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'en-IN';
-    recognition.interimResults = false;
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: conversationHistory,
+        temperature: 0.7,
+      }),
+    });
 
-    const status = document.getElementById("status");
-    const conversation = document.getElementById("conversation");
-    const textInput = document.getElementById("textInput");
+    const data = await response.json();
+    const reply = data.choices[0].message.content;
 
-    let chatHistory = [
-      { role: "system", content: "You are a friendly English tutor named Kritika. Speak and listen like a real person. Help users improve English fluency, ask questions, and explain kindly." },
-      { role: "assistant", content: "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?" }
-    ];
+    conversationHistory.push({ role: "assistant", content: reply });
+    displayMessage("Kritika", reply);
+  } catch (error) {
+    displayMessage("Error", "Something went wrong. Please try again.");
+    console.error("Groq API error:", error);
+  }
+}
 
-    window.onload = () => {
-      const initial = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
-      addToConversation("🧑‍🏫 Kritika: " + initial);
-      speak(initial);
-    };
+// Display message
+function displayMessage(sender, message) {
+  const msg = document.createElement("div");
+  msg.innerHTML = `<b>${sender}:</b> ${message}`;
+  msg.style.marginBottom = "10px";
+  msg.style.color = sender === "You" ? "purple" : "deeppink";
+  chatDisplay.appendChild(msg);
+  chatDisplay.scrollTop = chatDisplay.scrollHeight;
+}
 
-    async function startConversation() {
-      recognition.start();
-      status.innerText = "🎤 Listening...";
-    }
+// Handle text input
+sendButton.addEventListener("click", () => {
+  const message = userInput.value.trim();
+  if (message !== "") {
+    displayMessage("You", message);
+    userInput.value = "";
+    sendMessage(message);
+  }
+});
 
-    recognition.onresult = async (event) => {
-      const userText = event.results[0][0].transcript;
-      addToConversation("🧑‍🎓 You: " + userText);
-      chatHistory.push({ role: "user", content: userText });
-      status.innerText = "⏳ Thinking...";
-      await getReply();
-    };
+// Enter key to send
+userInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    sendButton.click();
+  }
+});
 
-    recognition.onerror = (e) => {
-      status.innerText = "❌ Error: " + e.error;
-    };
+// Speech Recognition
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = "en-IN";
+recognition.interimResults = false;
+recognition.onresult = (e) => {
+  const speech = e.results[0][0].transcript;
+  displayMessage("You", speech);
+  sendMessage(speech);
+};
 
-    async function sendText() {
-      const text = textInput.value.trim();
-      if (!text) return;
-      addToConversation("🧑‍🎓 You: " + text);
-      chatHistory.push({ role: "user", content: text });
-      textInput.value = "";
-      status.innerText = "⏳ Thinking...";
-      await getReply();
-    }
+talkButton.addEventListener("click", () => {
+  recognition.start();
+});
 
-    async function getReply() {
-      try {
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer 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"
-          },
-          body: JSON.stringify({
-            model: "mixtral-8x7b-32768",
-            messages: chatHistory
-          })
-        });
-        const data = await response.json();
-        const aiReply = data.choices[0].message.content;
-        chatHistory.push({ role: "assistant", content: aiReply });
-        addToConversation("🧑‍🏫 Kritika: " + aiReply);
-        speak(aiReply);
-        status.innerText = "✅ Ready to talk again...";
-      } catch (err) {
-        status.innerText = "❌ Failed to fetch AI reply.";
-        console.error(err);
-      }
-    }
-
-    function addToConversation(text) {
-      conversation.innerHTML += `<p>${text}</p>`;
-      conversation.scrollTop = conversation.scrollHeight;
-    }
-
-    function speak(text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-IN';
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
-    }
-  </script>
-</body>
-</html>
+// Intro message
+window.onload = () => {
+  const intro = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
+  displayMessage("Kritika", intro);
+  conversationHistory.push({ role: "assistant", content: intro });
+};
