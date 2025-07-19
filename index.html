@@ -53,12 +53,20 @@
     <input type="text" id="textInput" placeholder="Type or speak...">
     <button onclick="sendMessage()">Send</button>
     <button onclick="startListening()">🎤</button>
+    <button onclick="pauseSpeech()">⏸️ Pause</button>
+    <button onclick="resumeSpeech()">▶️ Resume</button>
+    <select id="voiceSelect">
+      <option value="en-IN">English (India)</option>
+      <option value="hi-IN">Hindi (India)</option>
+    </select>
   </div>
 
   <script>
     const apiKey = "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"; // your Groq key
     const chatbox = document.getElementById("chatbox");
     const inputField = document.getElementById("textInput");
+    const voiceSelect = document.getElementById("voiceSelect");
+    let currentUtterance = null;
 
     function appendMessage(sender, text) {
       const msg = document.createElement("div");
@@ -112,7 +120,7 @@
 
     function startListening() {
       const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = "en-IN";
+      recognition.lang = voiceSelect.value;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
@@ -130,12 +138,26 @@
     }
 
     function speak(text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-IN";
-      speechSynthesis.speak(utterance);
+      if (speechSynthesis.speaking) {
+        speechSynthesis.cancel();
+      }
+      currentUtterance = new SpeechSynthesisUtterance(text);
+      currentUtterance.lang = voiceSelect.value;
+      speechSynthesis.speak(currentUtterance);
     }
 
-    // Initial welcome
+    function pauseSpeech() {
+      if (speechSynthesis.speaking) {
+        speechSynthesis.pause();
+      }
+    }
+
+    function resumeSpeech() {
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+      }
+    }
+
     window.onload = () => {
       const welcome = "Hello! I'm Kritika, your AI English tutor. Let's begin practicing!";
       appendMessage("Kritika", welcome);
