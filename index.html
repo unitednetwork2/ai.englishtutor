@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Spoken English Tutor</title>
+  <title>2-Way AI Spoken English Tutor</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -38,11 +38,6 @@
     .btn-row button {
       flex: 1;
     }
-    .score {
-      margin-top: 10px;
-      font-weight: bold;
-      color: #2e7d32;
-    }
     .status {
       margin-top: 10px;
       font-weight: bold;
@@ -51,7 +46,8 @@
 </head>
 <body>
   <div class="container">
-    <h2>🎙️ AI Spoken English Tutor</h2>
+    <h2>🧑‍🏫 2-Way AI Spoken English Tutor</h2>
+
     <label for="accentMode">Choose Accent Focus:</label>
     <select id="accentMode">
       <option value="indian">Indian English</option>
@@ -59,15 +55,11 @@
     </select>
 
     <div class="btn-row">
-      <button onclick="startListening()">🎤 Start Speaking</button>
-      <button onclick="playPronunciation()">🔊 Play Pronunciation</button>
-      <button onclick="translateToHindi()">🇮🇳 Hindi Explanation</button>
+      <button onclick="startConversation()">🎙️ Start Talking</button>
     </div>
 
-    <p class="status" id="status">Click start to speak...</p>
-    <div class="output" id="output">🗣️ Your sentence will appear here.</div>
-    <div class="output" id="feedback">🧠 AI feedback will appear here.</div>
-    <div class="score" id="score"></div>
+    <p class="status" id="status">Click to begin speaking...</p>
+    <div class="output" id="conversation"></div>
   </div>
 
   <script>
@@ -76,28 +68,21 @@
     recognition.interimResults = false;
 
     const status = document.getElementById("status");
-    const output = document.getElementById("output");
-    const feedback = document.getElementById("feedback");
-    const score = document.getElementById("score");
+    const conversation = document.getElementById("conversation");
+    let chatHistory = [
+      { role: "system", content: "You are a friendly English tutor that speaks and listens. Help users improve their English in a kind and simple way. Use Indian English tone if asked." }
+    ];
 
-    let lastSentence = "";
-
-    function startListening() {
+    async function startConversation() {
       recognition.start();
       status.innerText = "🎤 Listening...";
-      output.innerText = "";
-      feedback.innerText = "";
-      score.innerText = "";
     }
 
     recognition.onresult = async (event) => {
-      const transcript = event.results[0][0].transcript;
-      lastSentence = transcript;
-      output.innerText = "🗣️ You said: " + transcript;
-      status.innerText = "⏳ Analyzing...";
-
-      const accent = document.getElementById("accentMode").value;
-      const prompt = `You are an English speaking tutor helping a student with a ${accent} accent. Evaluate their sentence: "${transcript}". Provide feedback on grammar, pronunciation, and fluency. Suggest corrections. Score them from 1 to 10 in each category.`;
+      const userText = event.results[0][0].transcript;
+      addToConversation("🧑‍🎓 You: " + userText);
+      status.innerText = "⏳ Thinking...";
+      chatHistory.push({ role: "user", content: userText });
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -107,53 +92,32 @@
         },
         body: JSON.stringify({
           model: "gpt-4",
-          messages: [
-            { role: "system", content: "You are an English tutor helping users improve pronunciation, fluency, and grammar." },
-            { role: "user", content: prompt }
-          ]
+          messages: chatHistory
         })
       });
 
       const data = await response.json();
-      const text = data.choices[0].message.content;
-      const scoreRegex = /Grammar.*?(\d+).*?Pronunciation.*?(\d+).*?Fluency.*?(\d+)/i;
-      const match = text.match(scoreRegex);
-      if (match) {
-        score.innerText = `📊 Grammar: ${match[1]}/10 | Pronunciation: ${match[2]}/10 | Fluency: ${match[3]}/10`;
-      }
-      feedback.innerText = "🧠 Feedback: " + text;
-      status.innerText = "✅ Done!";
-    }
+      const aiReply = data.choices[0].message.content;
+      chatHistory.push({ role: "assistant", content: aiReply });
+      addToConversation("🧑‍🏫 Tutor: " + aiReply);
+      speak(aiReply);
+      status.innerText = "✅ Speak again when ready...";
+    };
 
     recognition.onerror = (e) => {
       status.innerText = "❌ Error: " + e.error;
     };
 
-    function playPronunciation() {
-      const utter = new SpeechSynthesisUtterance(lastSentence);
-      utter.lang = 'en-IN';
-      window.speechSynthesis.speak(utter);
+    function addToConversation(text) {
+      conversation.innerHTML += `<p>${text}</p>`;
+      conversation.scrollTop = conversation.scrollHeight;
     }
 
-    async function translateToHindi() {
-      if (!lastSentence) return alert("Please speak something first.");
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer YOUR_OPENAI_API_KEY"
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: [
-            { role: "system", content: "You are a helpful assistant that translates English sentences into Hindi with simple explanation." },
-            { role: "user", content: `Translate this to Hindi and explain simply: ${lastSentence}` }
-          ]
-        })
-      });
-      const data = await response.json();
-      const hindiOutput = data.choices[0].message.content;
-      alert("📝 Hindi Explanation:\n\n" + hindiOutput);
+    function speak(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-IN';
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
     }
   </script>
 </body>
