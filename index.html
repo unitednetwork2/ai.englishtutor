@@ -1,93 +1,150 @@
-// ✅ script.js for AI English Tutor using Groq API
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI English Tutor - Kritika</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 0;
+    }
+    #chat {
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+    .message {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+    }
+    .user {
+      background: #d4f1f9;
+      text-align: right;
+    }
+    .bot {
+      background: #f1f1f1;
+      text-align: left;
+    }
+    #input-area {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #userInput {
+      flex: 1;
+    }
+    #fileUpload {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <h2>AI English Tutor - Kritika</h2>
+    <div id="messages"></div>
+    <div id="input-area">
+      <input type="text" id="userInput" placeholder="Type here..." />
+      <button onclick="sendMessage()">Send</button>
+      <button onclick="startVoice()">Ἲ4</button>
+    </div>
+    <input type="file" id="fileUpload" accept=".txt,.pdf" onchange="uploadFile()" />
+  </div>
 
-const apiKey = "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";
-const model = "mixtral-8x7b-32768"; // Or use "llama3-70b-8192" if needed
+  <script>
+    const apiKey = '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';
+    const chatBox = document.getElementById('messages');
 
-let conversationHistory = [
-  {
-    role: "system",
-    content: "You are Kritika, a friendly and natural AI English tutor for Indian students. You help them practice spoken English through casual conversation. Keep responses short, friendly, and engaging. Ask one question at a time."
-  },
-];
+    function addMessage(text, sender) {
+      const div = document.createElement('div');
+      div.className = 'message ' + sender;
+      div.innerText = text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
 
-const chatDisplay = document.getElementById("chat-display");
-const userInput = document.getElementById("user-input");
-const sendButton = document.getElementById("send-button");
-const talkButton = document.getElementById("talk-button");
+      if (sender === 'bot') {
+        const synth = window.speechSynthesis;
+        const utter = new SpeechSynthesisUtterance(text);
+        synth.speak(utter);
+      }
+    }
 
-// Send message to Groq
-async function sendMessage(message) {
-  conversationHistory.push({ role: "user", content: message });
+    async function sendMessage() {
+      const input = document.getElementById('userInput');
+      const message = input.value.trim();
+      if (!message) return;
+      addMessage(message, 'user');
+      input.value = '';
 
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: conversationHistory,
-        temperature: 0.7,
-      }),
-    });
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'mixtral-8x7b-32768',
+          messages: [{ role: 'system', content: "You are Kritika, a friendly English tutor. Speak naturally." },
+                    { role: 'user', content: message }]
+        })
+      });
 
-    const data = await response.json();
-    const reply = data.choices[0].message.content;
+      const data = await response.json();
+      const reply = data.choices[0].message.content;
+      addMessage(reply, 'bot');
+    }
 
-    conversationHistory.push({ role: "assistant", content: reply });
-    displayMessage("Kritika", reply);
-  } catch (error) {
-    displayMessage("Error", "Something went wrong. Please try again.");
-    console.error("Groq API error:", error);
-  }
-}
+    function startVoice() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-IN';
+      recognition.interimResults = false;
+      recognition.onresult = (event) => {
+        document.getElementById('userInput').value = event.results[0][0].transcript;
+        sendMessage();
+      };
+      recognition.start();
+    }
 
-// Display message
-function displayMessage(sender, message) {
-  const msg = document.createElement("div");
-  msg.innerHTML = `<b>${sender}:</b> ${message}`;
-  msg.style.marginBottom = "10px";
-  msg.style.color = sender === "You" ? "purple" : "deeppink";
-  chatDisplay.appendChild(msg);
-  chatDisplay.scrollTop = chatDisplay.scrollHeight;
-}
+    function uploadFile() {
+      const file = document.getElementById('fileUpload').files[0];
+      if (!file) return;
 
-// Handle text input
-sendButton.addEventListener("click", () => {
-  const message = userInput.value.trim();
-  if (message !== "") {
-    displayMessage("You", message);
-    userInput.value = "";
-    sendMessage(message);
-  }
-});
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = reader.result.slice(0, 5000); // limit to avoid long input
+        addMessage("I've uploaded a file. Ask me questions from it.", 'user');
+        addMessage("Got it! You can now ask questions about the content.", 'bot');
+        // Save content as context
+        window.ebookContext = content;
+      };
 
-// Enter key to send
-userInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") {
-    sendButton.click();
-  }
-});
-
-// Speech Recognition
-const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-recognition.lang = "en-IN";
-recognition.interimResults = false;
-recognition.onresult = (e) => {
-  const speech = e.results[0][0].transcript;
-  displayMessage("You", speech);
-  sendMessage(speech);
-};
-
-talkButton.addEventListener("click", () => {
-  recognition.start();
-});
-
-// Intro message
-window.onload = () => {
-  const intro = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
-  displayMessage("Kritika", intro);
-  conversationHistory.push({ role: "assistant", content: intro });
-};
+      if (file.type === 'application/pdf') {
+        import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js').then(() => {
+          const pdfjsLib = window['pdfjs-dist/build/pdf'];
+          pdfjsLib.getDocument(URL.createObjectURL(file)).promise.then(pdf => {
+            let text = '';
+            let pagePromises = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+              pagePromises.push(
+                pdf.getPage(i).then(page =>
+                  page.getTextContent().then(content => {
+                    text += content.items.map(i => i.str).join(' ');
+                  })
+                )
+              );
+            }
+            Promise.all(pagePromises).then(() => {
+              window.ebookContext = text.slice(0, 5000);
+            });
+          });
+        });
+      } else {
+        reader.readAsText(file);
+      }
+    }
+  </script>
+</body>
+</html>
