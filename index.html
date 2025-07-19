@@ -69,9 +69,26 @@
 
     const status = document.getElementById("status");
     const conversation = document.getElementById("conversation");
+    const accentMode = document.getElementById("accentMode");
+
+    let userName = "";
+
     let chatHistory = [
-      { role: "system", content: "You are a friendly English tutor that speaks and listens. Help users improve their English in a kind and simple way. Use Indian English tone if asked." }
+      {
+        role: "system",
+        content: "You are Kritika, a friendly English tutor that speaks and listens. Help users improve their English in a kind and simple way. Use Indian English tone if selected. You can explain things in Hindi if user asks. Ask the user's name in the beginning and remember it."
+      },
+      {
+        role: "assistant",
+        content: "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me your name and a little about yourself?"
+      }
     ];
+
+    window.onload = () => {
+      const initial = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me your name and a little about yourself?";
+      addToConversation("🧑‍🏫 Kritika: " + initial);
+      speak(initial);
+    };
 
     async function startConversation() {
       recognition.start();
@@ -98,8 +115,14 @@
 
       const data = await response.json();
       const aiReply = data.choices[0].message.content;
+
+      if (!userName) {
+        const match = userText.match(/my name is (\w+)/i);
+        if (match) userName = match[1];
+      }
+
       chatHistory.push({ role: "assistant", content: aiReply });
-      addToConversation("🧑‍🏫 Tutor: " + aiReply);
+      addToConversation("🧑‍🏫 Kritika: " + aiReply);
       speak(aiReply);
       status.innerText = "✅ Speak again when ready...";
     };
@@ -115,7 +138,7 @@
 
     function speak(text) {
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-IN';
+      utterance.lang = accentMode.value === 'hindi' ? 'hi-IN' : 'en-IN';
       utterance.rate = 0.95;
       window.speechSynthesis.speak(utterance);
     }
