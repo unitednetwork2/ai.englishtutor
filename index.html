@@ -8,7 +8,7 @@
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
-      background: #f9f9f9;
+      background: #f2f2f2;
     }
     h1 {
       text-align: center;
@@ -36,37 +36,56 @@
       max-width: 600px;
       margin-left: auto;
       margin-right: auto;
+      flex-wrap: wrap;
     }
-    input[type=text] {
+    input[type=text], select {
       flex: 1;
       padding: 8px;
     }
     button {
       padding: 8px 12px;
     }
+    #clearButton, #roleButton {
+      display: block;
+      margin: 10px auto;
+      background-color: #444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 10px;
+    }
+    #clearButton {
+      background-color: #e53935;
+    }
   </style>
 </head>
 <body>
   <h1>AI English Tutor - Kritika</h1>
   <div id="chatbox"></div>
+
+  <button id="clearButton" onclick="clearChat()">🧹 Clear Chat</button>
+  <button id="roleButton" onclick="toggleRole()">🎭 Switch to Teacher Mode</button>
+
   <div id="inputArea">
     <input type="text" id="textInput" placeholder="Type or speak...">
     <button onclick="sendMessage()">Send</button>
     <button onclick="startListening()">🎤</button>
-    <button onclick="pauseSpeech()">⏸️ Pause</button>
-    <button onclick="resumeSpeech()">▶️ Resume</button>
-    <select id="voiceSelect">
-      <option value="en-IN">English (India)</option>
-      <option value="hi-IN">Hindi (India)</option>
+    <select id="voiceLang">
+      <option value="en-IN">🇮🇳 English</option>
+      <option value="hi-IN">🇮🇳 Hindi</option>
     </select>
+    <button onclick="pauseVoice()">⏸ Pause</button>
+    <button onclick="resumeVoice()">▶ Resume</button>
   </div>
 
   <script>
-    const apiKey = "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"; // your Groq key
+    const apiKey = "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"; // Groq API Key
     const chatbox = document.getElementById("chatbox");
     const inputField = document.getElementById("textInput");
-    const voiceSelect = document.getElementById("voiceSelect");
-    let currentUtterance = null;
+    const voiceLangSelect = document.getElementById("voiceLang");
+    const roleButton = document.getElementById("roleButton");
+
+    let currentRole = "student"; // default mode
 
     function appendMessage(sender, text) {
       const msg = document.createElement("div");
@@ -89,6 +108,11 @@
       chatbox.appendChild(thinking);
       chatbox.scrollTop = chatbox.scrollHeight;
 
+      const systemPrompt =
+        currentRole === "teacher"
+          ? "You are Kritika, an English teacher. Respond in a professional way. Correct the user's grammar and provide learning tips in English."
+          : "You are Kritika, a friendly spoken English tutor. Respond like a human friend and help the user practice English with encouragement.";
+
       try {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
@@ -97,8 +121,11 @@
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "llama3-8b-8192",
-            messages: [{ role: "user", content: message }],
+            model: "mixtral-8x7b-32768",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: message }
+            ]
           }),
         });
 
@@ -120,7 +147,7 @@
 
     function startListening() {
       const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = voiceSelect.value;
+      recognition.lang = voiceLangSelect.value;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
@@ -138,32 +165,65 @@
     }
 
     function speak(text) {
-      if (speechSynthesis.speaking) {
-        speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = voiceLangSelect.value;
+
+      const voices = window.speechSynthesis.getVoices();
+      const femaleVoices = voices.filter(voice =>
+        voice.lang === utterance.lang && voice.name.toLowerCase().includes("female")
+      );
+
+      if (femaleVoices.length > 0) {
+        utterance.voice = femaleVoices[0];
+      } else {
+        const fallback = voices.find(v => v.lang === utterance.lang);
+        if (fallback) utterance.voice = fallback;
       }
-      currentUtterance = new SpeechSynthesisUtterance(text);
-      currentUtterance.lang = voiceSelect.value;
-      speechSynthesis.speak(currentUtterance);
+
+      speechSynthesis.cancel(); // Stop any running speech
+      speechSynthesis.speak(utterance);
     }
 
-    function pauseSpeech() {
-      if (speechSynthesis.speaking) {
-        speechSynthesis.pause();
+    function pauseVoice() {
+      speechSynthesis.pause();
+    }
+
+    function resumeVoice() {
+      speechSynthesis.resume();
+    }
+
+    function clearChat() {
+      chatbox.innerHTML = '';
+      appendMessage("Kritika", welcomeText());
+      speak(welcomeText());
+    }
+
+    function toggleRole() {
+      if (currentRole === "student") {
+        currentRole = "teacher";
+        roleButton.textContent = "🎭 Switch to Student Mode";
+        appendMessage("Kritika", "Teacher mode activated. I will now correct your grammar.");
+        speak("Teacher mode activated. I will now correct your grammar.");
+      } else {
+        currentRole = "student";
+        roleButton.textContent = "🎭 Switch to Teacher Mode";
+        appendMessage("Kritika", "Switched to student mode. Let's practice English casually!");
+        speak("Switched to student mode. Let's practice English casually!");
       }
     }
 
-    function resumeSpeech() {
-      if (speechSynthesis.paused) {
-        speechSynthesis.resume();
-      }
+    function welcomeText() {
+      return currentRole === "teacher"
+        ? "Welcome back! I'm Kritika, your English teacher. Let's focus on grammar and fluency."
+        : "Hi! I'm Kritika, your spoken English tutor. Let's enjoy practicing English!";
     }
 
     window.onload = () => {
-      const welcome = "Hello! I'm Kritika, your AI English tutor. Let's begin practicing!";
+      const welcome = welcomeText();
       appendMessage("Kritika", welcome);
-      speak(welcome);
+      window.speechSynthesis.onvoiceschanged = () => speak(welcome);
       inputField.focus();
-    }
+    };
   </script>
 </body>
 </html>
