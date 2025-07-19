@@ -2,145 +2,124 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>2-Way AI Spoken English Tutor</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f0f2f5;
-      padding: 20px;
+      background: #f0f0f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
     }
     .container {
-      max-width: 700px;
-      margin: auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      text-align: center;
+      width: 90%;
+      max-width: 500px;
     }
-    select, button, textarea {
-      width: 100%;
-      margin-top: 10px;
+    select, button {
       padding: 10px;
+      margin-top: 10px;
+      width: 100%;
       font-size: 16px;
     }
-    .output {
-      background: #e3f2fd;
-      padding: 10px;
-      border-radius: 8px;
-      margin-top: 15px;
+    #output {
+      margin-top: 20px;
+      min-height: 50px;
+      font-size: 18px;
+      text-align: left;
     }
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .btn-row button {
-      flex: 1;
-    }
-    .status {
-      margin-top: 10px;
-      font-weight: bold;
-    }
+    .bot { color: #0077cc; }
+    .user { color: #333; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>🧑‍🏫 2-Way AI Spoken English Tutor</h2>
-
-    <label for="accentMode">Choose Accent Focus:</label>
-    <select id="accentMode">
-      <option value="indian">Indian English</option>
-      <option value="hindi">Hindi-English Accent</option>
+    <h2>👩‍🏫 Kritika – Your AI English Tutor</h2>
+    <label>Choose Accent Focus:</label>
+    <select id="accent">
+      <option value="en-IN">Indian English</option>
+      <option value="hi-IN">Hindi-English</option>
     </select>
-
-    <div class="btn-row">
-      <button onclick="startConversation()">🎙️ Start Talking</button>
-    </div>
-
-    <p class="status" id="status">Click to begin speaking...</p>
-    <div class="output" id="conversation"></div>
+    <button id="start">🎙️ Start Talking</button>
+    <div id="output"></div>
   </div>
 
   <script>
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'en-IN';
+    const startBtn = document.getElementById("start");
+    const output = document.getElementById("output");
+    const accent = document.getElementById("accent");
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
     recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-    const status = document.getElementById("status");
-    const conversation = document.getElementById("conversation");
-    const accentMode = document.getElementById("accentMode");
+    const synth = window.speechSynthesis;
 
-    let userName = "";
+    let conversation = [];
+    const tutorIntro = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
 
-    let chatHistory = [
-      {
-        role: "system",
-        content: "You are Kritika, a friendly English tutor that speaks and listens. Help users improve their English in a kind and simple way. Use Indian English tone if selected. You can explain things in Hindi if user asks. Ask the user's name in the beginning and remember it."
-      },
-      {
-        role: "assistant",
-        content: "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me your name and a little about yourself?"
-      }
-    ];
-
-    window.onload = () => {
-      const initial = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me your name and a little about yourself?";
-      addToConversation("🧑‍🏫 Kritika: " + initial);
-      speak(initial);
+    startBtn.onclick = () => {
+      startBtn.disabled = true;
+      speakAndListen(tutorIntro);
     };
 
-    async function startConversation() {
-      recognition.start();
-      status.innerText = "🎤 Listening...";
+    function speakAndListen(text) {
+      conversation.push({ role: "bot", text });
+      updateChat();
+
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = accent.value;
+      synth.speak(utter);
+
+      utter.onend = () => {
+        recognition.lang = accent.value;
+        recognition.start();
+      };
     }
 
     recognition.onresult = async (event) => {
-      const userText = event.results[0][0].transcript;
-      addToConversation("🧑‍🎓 You: " + userText);
-      status.innerText = "⏳ Thinking...";
-      chatHistory.push({ role: "user", content: userText });
+      const userSpeech = event.results[0][0].transcript;
+      conversation.push({ role: "user", text: userSpeech });
+      updateChat();
 
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer YOUR_OPENAI_API_KEY"
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: chatHistory
-        })
-      });
-
-      const data = await response.json();
-      const aiReply = data.choices[0].message.content;
-
-      if (!userName) {
-        const match = userText.match(/my name is (\w+)/i);
-        if (match) userName = match[1];
-      }
-
-      chatHistory.push({ role: "assistant", content: aiReply });
-      addToConversation("🧑‍🏫 Kritika: " + aiReply);
-      speak(aiReply);
-      status.innerText = "✅ Speak again when ready...";
+      // GPT-like reply simulation (can connect to server for real AI)
+      const reply = await generateReply(userSpeech);
+      speakAndListen(reply);
     };
 
-    recognition.onerror = (e) => {
-      status.innerText = "❌ Error: " + e.error;
+    recognition.onerror = (event) => {
+      conversation.push({ role: "bot", text: `Oops, I couldn’t hear that. (${event.error})` });
+      updateChat();
+      startBtn.disabled = false;
     };
 
-    function addToConversation(text) {
-      conversation.innerHTML += `<p>${text}</p>`;
-      conversation.scrollTop = conversation.scrollHeight;
+    function updateChat() {
+      output.innerHTML = conversation.map(msg =>
+        `<div class="${msg.role}"><strong>${msg.role === 'bot' ? '👩 Kritika' : '🧑 You'}:</strong> ${msg.text}</div>`
+      ).join('');
     }
 
-    function speak(text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = accentMode.value === 'hindi' ? 'hi-IN' : 'en-IN';
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
+    async function generateReply(userInput) {
+      // Simple rule-based simulation for demo
+      userInput = userInput.toLowerCase();
+
+      if (userInput.includes("my name is")) {
+        return "Nice to meet you! What do you like to do in your free time?";
+      } else if (userInput.includes("how are you")) {
+        return "I'm great, thank you! Ready to help you improve your English.";
+      } else if (userInput.includes("hobby") || userInput.includes("like")) {
+        return "That's a nice hobby! Let's try speaking more about it.";
+      } else {
+        return "Interesting! Can you tell me more or ask me a question?";
+      }
     }
   </script>
 </body>
