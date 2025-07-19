@@ -3,75 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>2-Way AI Spoken English Tutor - Kritika</title>
+  <title>2-Way AI Spoken English Tutor</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .tutor-container {
-      background: white;
-      padding: 20px;
-      border-radius: 15px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.1);
-      width: 90%;
-      max-width: 500px;
-    }
-    select, input, button {
-      width: 100%;
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-    }
-    .chat-box {
-      max-height: 300px;
-      overflow-y: auto;
-      margin-top: 10px;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      background-color: #fafafa;
-    }
-    .user { color: green; margin-bottom: 10px; }
-    .tutor { color: purple; margin-bottom: 10px; }
+    body { font-family: Arial; background: #f5f0fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    #app { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 0 15px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
+    h1 { text-align: center; }
+    select, textarea, input, button { width: 100%; margin: 10px 0; padding: 10px; border-radius: 10px; border: 1px solid #ccc; }
+    .chatbox { height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 10px; background: #fafafa; }
+    .user { color: blue; margin: 5px 0; }
+    .bot { color: purple; margin: 5px 0; }
   </style>
 </head>
 <body>
-  <div class="tutor-container">
-    <h2>👩‍🏫 2-Way AI Spoken English Tutor</h2>
+  <div id="app">
+    <h1>🧑‍🏫 2-Way AI Spoken English Tutor</h1>
     <label>Choose Accent Focus:</label>
     <select id="accent">
       <option value="en-IN">Indian English</option>
       <option value="hi-IN">Hindi Accent</option>
     </select>
-
-    <div class="chat-box" id="chat"></div>
-
-    <input type="text" id="input" placeholder="Type your message here...">
+    <div class="chatbox" id="chat"></div>
+    <input type="text" id="userInput" placeholder="Type your message here..." />
     <button onclick="sendMessage()">Send</button>
-    <button onclick="startListening()">🎙️ Start Talking</button>
+    <button onclick="startListening()">🎤 Start Talking</button>
   </div>
 
   <script>
-    let synth = window.speechSynthesis;
-    let recognition;
-
-    // Chat logic
+    const apiKey = "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";
     const chat = document.getElementById("chat");
-    const input = document.getElementById("input");
+    const input = document.getElementById("userInput");
     const accent = document.getElementById("accent");
 
-    const tutorIntro = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
-    speak(tutorIntro);
-    appendMessage(tutorIntro, 'tutor');
-
-    function appendMessage(message, sender) {
+    function addMessage(message, sender) {
       const msg = document.createElement("div");
       msg.className = sender;
       msg.innerText = message;
@@ -79,59 +42,60 @@
       chat.scrollTop = chat.scrollHeight;
     }
 
-    async function sendMessage() {
-      const userInput = input.value.trim();
-      if (!userInput) return;
-      appendMessage(userInput, 'user');
+    async function sendMessage(text = null) {
+      const userMessage = text || input.value;
+      if (!userMessage) return;
+      addMessage("You: " + userMessage, "user");
       input.value = "";
 
-      // Call OpenAI API
+      const messages = Array.from(chat.querySelectorAll(".user, .bot"))
+        .map(el => el.innerText.replace(/^You: |Kritika: /, ""));
+
+      messages.push(userMessage);
+
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer YOUR_OPENAI_API_KEY"
+          "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "gpt-4",
+          model: "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: "You are Kritika, a friendly Indian English-speaking AI tutor who helps learners improve spoken English. Answer helpfully and ask occasional questions." },
-            { role: "user", content: userInput }
+            { role: "system", content: "You are Kritika, a friendly AI English tutor who speaks with an Indian accent. Help the user improve their spoken English and ask questions naturally." },
+            ...messages.slice(-6).map(m => ({ role: "user", content: m }))
           ]
         })
       });
 
       const data = await response.json();
       const reply = data.choices[0].message.content;
-      appendMessage(reply, 'tutor');
+      addMessage("Kritika: " + reply, "bot");
       speak(reply);
     }
 
     function speak(text) {
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = accent.value;
-      synth.speak(utter);
+      speechSynthesis.speak(utter);
     }
 
     function startListening() {
-      if (!('webkitSpeechRecognition' in window)) {
-        alert("Speech Recognition not supported");
-        return;
-      }
-      recognition = new webkitSpeechRecognition();
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
       recognition.lang = accent.value;
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        input.value = transcript;
-        sendMessage();
-      };
-
-      recognition.onerror = (e) => alert("Error: " + e.error);
       recognition.start();
+      recognition.onresult = event => {
+        const transcript = event.results[0][0].transcript;
+        sendMessage(transcript);
+      };
     }
+
+    // Start with initial message
+    window.onload = () => {
+      const greeting = "Hello! How are you? My name is Kritika, your AI tutor. Can you tell me about yourself?";
+      addMessage("Kritika: " + greeting, "bot");
+      speak(greeting);
+    };
   </script>
 </body>
 </html>
